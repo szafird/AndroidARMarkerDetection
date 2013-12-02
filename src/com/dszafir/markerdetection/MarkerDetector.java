@@ -294,8 +294,6 @@ public class MarkerDetector {
 	}
 
 	private void estimatePosition(Vector<Marker> visibleMarkers) {
-		
-		//TODO: check if this is right...
 		for (Marker marker : visibleMarkers) {
 			marker.calculateExtrinsics(cameraParameters.getCameraMatrix(), 
 					cameraParameters.getDistCoeff(), markerSizeMeters);
