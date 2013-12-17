@@ -29,7 +29,7 @@ import android.util.Log;
 // such as type in member fields and call it only once
 public class MarkerDetector {
 	
-	private enum ThresholdMethod {FIXED_THRES,ADPT_THRES,CANNY};
+	public enum ThresholdMethod {FIXED_THRES,ADPT_THRES,CANNY};
 		
 	private float markerSizeMeters;
 	private Size canonicalMarkerSize;
@@ -40,7 +40,7 @@ public class MarkerDetector {
 	
 	public MarkerDetector(CameraParameters cameraParameters, float markerSizeMeters){
 		
-		if (cameraParameters == null || !cameraParameters.isValid())
+		if (cameraParameters == null)
 			throw new IllegalArgumentException("Error - invalid camera parameters");
 		
 		if (markerSizeMeters <= 0) throw new IllegalArgumentException("Error - invalid marker size");
@@ -55,6 +55,10 @@ public class MarkerDetector {
 				canonicalMarkerSize.width-1,0,
 				canonicalMarkerSize.width-1,canonicalMarkerSize.height-1,
 				   0,canonicalMarkerSize.height-1);
+	}
+	
+	public void setCameraParameters(CameraParameters cameraParameters) {
+		this.cameraParameters = cameraParameters;
 	}
 	
 	/**
@@ -95,17 +99,18 @@ public class MarkerDetector {
 	private Vector<Marker> findMarkers(Mat grayImage)
 	{
 		// Make it binary
-	    Mat thresholdImg = performThreshold(grayImage, ThresholdMethod.ADPT_THRES);
+//	    Mat thresholdImg = performThreshold(grayImage, ThresholdMethod.ADPT_THRES);
+		 Mat thresholdImg = performThreshold(grayImage, ThresholdMethod.FIXED_THRES);
 	    
 	    //Detect Contours
 	    Vector<MatOfPoint> contours = findContours(thresholdImg, grayImage.cols() / 5);
 	    
-//	    Log.d("ADebugTag", "Contours: " + contours.size());
+	    Log.d("ADebugTag", "Contours: " + contours.size());
 	    
 	    // Find closed contours that can be approximated with 4 points
 	    Vector<Marker> detectedMarkers = findCandidates(contours);
 	    
-//	    Log.d("ADebugTag", "Detected Markers: " + detectedMarkers.size());
+	    Log.d("ADebugTag", "Detected Markers: " + detectedMarkers.size());
 	    
 	    // Decode markers and ensure each is detected only once
 	    Vector<Marker> visibleMarkers = recognizeMarkers(grayImage, detectedMarkers);
@@ -118,7 +123,7 @@ public class MarkerDetector {
 	    return visibleMarkers;
 	}
 	
-	private Mat performThreshold(Mat src, ThresholdMethod method){
+	public static Mat performThreshold(Mat src, ThresholdMethod method){
 		Mat dst = new Mat();
 		switch(method){
 		case FIXED_THRES:
@@ -129,7 +134,7 @@ public class MarkerDetector {
 					Imgproc.THRESH_BINARY_INV, 7, 7); //(int)thresParam1,thresParam2);
 			break;
 		case CANNY:
-			Imgproc.Canny(src, dst, 10, 220);// TODO this parameters??
+			Imgproc.Canny(src, dst, 10, 220);// TODO what are appropriate parameters for canny?
 			break;
 		}
 		return dst;
@@ -296,7 +301,8 @@ public class MarkerDetector {
 	private void estimatePosition(Vector<Marker> visibleMarkers) {
 		for (Marker marker : visibleMarkers) {
 			marker.calculateExtrinsics(cameraParameters.getCameraMatrix(), 
-					cameraParameters.getDistCoeff(), markerSizeMeters);
+					cameraParameters.getDistortionMatrixAsMat(), markerSizeMeters);
+//			marker.calculateExtrinsicsFisheye(markerSizeMeters);
 		}
 	}
 }

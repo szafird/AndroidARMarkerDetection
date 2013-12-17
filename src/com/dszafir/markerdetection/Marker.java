@@ -18,6 +18,8 @@ import org.opencv.core.Point3;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
+import android.util.Log;
+
 
 /**
  * Marker detected in an image. It must be a four-squared contour with black border and
@@ -102,7 +104,10 @@ public class Marker implements Comparable<Marker>{
 		MatOfPoint3f objectPoints = new MatOfPoint3f();		
 		objectPoints.fromList(cubeVectorPoints);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
-		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistCoeff(), imagePoints);
+		
+		//Project points into camera space
+		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistortionMatrixAsMat(), imagePoints);
+		
 		List<Point> pts = imagePoints.toList();
 		
 	    for (int i=0;i<4;i++){
@@ -117,7 +122,6 @@ public class Marker implements Comparable<Marker>{
 		
 	    if(writeId){
 	    	String cad = "id="+Integer.toString(id);
-//	    	calcCenter();
 	        Core.putText(in, cad, center, Core.FONT_HERSHEY_SIMPLEX, 0.5, color, 2);
 	    }
 	    
@@ -151,7 +155,7 @@ public class Marker implements Comparable<Marker>{
 		
 		objectPoints.fromList(points);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
-		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistCoeff(), imagePoints);
+		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistortionMatrixAsMat(), imagePoints);
 		
 		List<Point> pts = imagePoints.toList();
 		// draw
@@ -173,7 +177,7 @@ public class Marker implements Comparable<Marker>{
 		
 		objectPoints.fromList(points);
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
-		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistCoeff(), imagePoints);
+		Calib3d.projectPoints(objectPoints, rVec, tVec, cp.getCameraMatrix(), cp.getDistortionMatrixAsMat(), imagePoints);
 		
 		List<Point> pts = imagePoints.toList();
 		// draw
@@ -205,11 +209,6 @@ public class Marker implements Comparable<Marker>{
 	private void calcCenter()
 	{
 			setPointsCounterClockwise();
-			
-	//		center = new Point(Math.abs(points.get(0).x - points.get(2).x)/2,
-	//						Math.abs(points.get(0).y - points.get(2).y)/2);
-			
-//			if (center == null) center = new Point(0,0);
 			
 			center = new Point(0,0);
 			
@@ -244,7 +243,7 @@ public class Marker implements Comparable<Marker>{
 	        int index=(id>>2*(4-y)) & 0x0003;
 	        int val=ids[index];
 	        for (int x=0;x<5;x++) {
-	            Mat roi=marker.submat((x+1)*swidth, (x+2)*swidth,(y+1)*swidth,(y+2)*swidth);// TODO check
+	            Mat roi=marker.submat((x+1)*swidth, (x+2)*swidth,(y+1)*swidth,(y+2)*swidth);
 	            if ( (( val>>(4-x) ) & 0x0001) != 0 )
 	            	roi.setTo(new Scalar(255));
 	            else
@@ -343,14 +342,12 @@ public class Marker implements Comparable<Marker>{
 	}
 	
 	/**
-	 * Calculate 3D position of the marker based on its translation and rotation matrix.
-	 * This method fills in these matrix properly.
+	 * Calculate translation and rotation matrix for this marker.
+	 * 
 	 * @param camMatrix
 	 * @param distCoeff
 	 */
-	protected void calculateExtrinsics(Mat camMatrix, MatOfDouble distCoeffs, float sizeMeters){
-		// TODO check params
-		
+	protected void calculateExtrinsics(Mat camMatrix, MatOfDouble distCoeffs, float sizeMeters) {
 		// set the obj 3D points
 		double halfSize = sizeMeters/2.0;
 		List<Point3> objPoints = new ArrayList<Point3>();

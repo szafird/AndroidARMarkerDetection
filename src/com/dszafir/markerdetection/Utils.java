@@ -3,6 +3,7 @@ package com.dszafir.markerdetection;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.imgproc.Imgproc;
 
 /**
@@ -12,7 +13,7 @@ import org.opencv.imgproc.Imgproc;
  *
  */
 public class Utils {
-	
+
 	/**
 	 * Remove distortion caused by a fisheye lense using FOV model 
 	 * (http://hal.inria.fr/docs/00/26/72/47/PDF/distcalib.pdf)
@@ -20,58 +21,97 @@ public class Utils {
 	 * @param frame The input image
 	 * @return The undistorted image
 	 */
-	public static Mat undistortFrame(Mat frame) {
-		
-		Mat mapx = new Mat(frame.size(), CvType.CV_32FC1);
-		Mat mapy = new Mat(frame.size(), CvType.CV_32FC1);
+	public static Mat undistortFrame(Mat frame, FisheyeCameraParameters cp) {
 
-		//Camera focal lengths in pixels
-		double fu = 258.83;
-		double fv = 258.346;   
- 
-		//Optical center (pixels)
-		double Cu = 325.292;   
-		double Cv = 247.001;
-		
-		//Field of view
-		double w = 0.925107;
-		
+		double Fx = cp.getFx();
+		double Fy = cp.getFy();
+		double Cx = cp.getCx(); 
+		double Cy = cp.getCy();
+
+		double w = cp.getW();
 		double invW = 1/w;
-		double theta = Math.tan(w/2);
-		
-		double[][] xs = new double[frame.rows()][frame.cols()];
-		double[][] ys = new double[frame.rows()][frame.cols()];
+		double theta = 2*Math.tan(w/2);
+
+		double[] xMapArray = new double[frame.rows()*frame.cols()];
+		double[] yMapArray = new double[frame.rows()*frame.cols()];
 		for( int j = 0; j < frame.rows(); j++ )
 		{
 			for( int i = 0; i < frame.cols(); i++ )
-			{	
-					// U & V are real would units from the optical center. Defined by Cu and Cv (in pixels)
-					double u = (i - Cu) / fu;
-					double v = (j - Cv) / fv;
-					
-					// Calculate undistorted vector norm
-					double ru = Math.sqrt(u*u + v*v);
+			{
+				// U & V are real would units from the optical center. Defined by Cx and Cy (in pixels)
+				double u = (i - Cx) / Fx;
+				double v = (j - Cy) / Fy;
 
-					// Calculate distorted vector norm
-					double rd = invW * Math.atan(2 * ru * theta);
-					
-					// Apply the magnitude change and convert back to pixel units
-					double xVal =  rd * u * fu / ru + Cu;
-					double yVal =  rd * v * fv / ru + Cv;
-					
-					xs[j][i] = xVal;					
-					ys[j][i] = yVal;
-		    }
+				// Calulate undistorted vector norm
+				double Ru = Math.sqrt(u*u + v*v);
+
+				// Calculate distorted vector norm
+				double Rd = invW * Math.atan(Ru * theta)/(w);
+
+				// Apply the magnitude change and convert back to pixel units
+				double xVal =  Rd * u * Fx / Ru + Cx;
+				double yVal =  Rd * v * Fy / Ru + Cy;
+
+				xMapArray[j*(frame.cols()) + i] = xVal;
+				yMapArray[j*(frame.cols()) + i] = yVal;
+			}
 		}
-		
-		for(int row = 0; row < xs.length; ++row) {
-			mapx.put(row, 0, xs[row]);
-			mapy.put(row, 0, ys[row]);
-		}
-		
+
+		Mat xMapMat = new Mat(frame.size(), CvType.CV_32FC1);
+		Mat yMapMat = new Mat(frame.size(), CvType.CV_32FC1);
+		xMapMat.put(0,0,xMapArray);
+		yMapMat.put(0,0,yMapArray);
+
 		Mat undistorted = new Mat();
-		Imgproc.remap(frame, undistorted, mapx, mapy, Imgproc.INTER_LINEAR);
-		
+		Imgproc.remap(frame, undistorted, xMapMat, yMapMat, Imgproc.INTER_LINEAR);
+
+		return undistorted;
+	}
+
+	public static MatOfPoint2f undistortFrame(MatOfPoint2f frame, FisheyeCameraParameters cp) {
+
+		double Fx = cp.getFx();
+		double Fy = cp.getFy();
+		double Cx = cp.getCx(); 
+		double Cy = cp.getCy();
+
+		double w = cp.getW();
+		double invW = 1/w;
+		double theta = 2*Math.tan(w/2);
+
+		double[] xMapArray = new double[frame.rows()*frame.cols()];
+		double[] yMapArray = new double[frame.rows()*frame.cols()];
+		for( int j = 0; j < frame.rows(); j++ )
+		{
+			for( int i = 0; i < frame.cols(); i++ )
+			{
+				// U & V are real would units from the optical center. Defined by Cu and Cv (in pixels)
+				double u = (i - Cx) / Fx;
+				double v = (j - Cy) / Fy;
+
+				// Calulate undistorted vector norm
+				double Ru = Math.sqrt(u*u + v*v);
+
+				// Calculate distorted vector norm
+				double Rd = invW * Math.atan(Ru * theta)/(w);
+
+				// Apply the magnitude change and convert back to pixel units
+				double xVal =  Rd * u * Fx / Ru + Cx;
+				double yVal =  Rd * v * Fy / Ru + Cy;
+
+				xMapArray[j*(frame.cols()) + i] = xVal;
+				yMapArray[j*(frame.cols()) + i] = yVal;
+			}
+		}
+
+		Mat xMapMat = new Mat(frame.size(), CvType.CV_32FC1);
+		Mat yMapMat = new Mat(frame.size(), CvType.CV_32FC1);
+		xMapMat.put(0,0,xMapArray);
+		yMapMat.put(0,0,yMapArray);
+
+		MatOfPoint2f undistorted = new MatOfPoint2f();
+		Imgproc.remap(frame, undistorted, xMapMat, yMapMat, Imgproc.INTER_LINEAR);
+
 		return undistorted;
 	}
 }

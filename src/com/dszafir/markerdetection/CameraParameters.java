@@ -2,6 +2,8 @@ package com.dszafir.markerdetection;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.StringTokenizer;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -32,47 +34,41 @@ public class CameraParameters {
 	// | Fx 0  Cx |
 	// | 0  Fy Cy |
 	// | 0  0   1 |
-	private Mat cameraMatrix;
-	private MatOfDouble distortionMatrix;
-	private Size camSize;
+	private double Fx,Fy,Cx,Cy;
+	private double[] distortionMatrix;
 	
 	public CameraParameters(){
-		cameraMatrix = new Mat(3,3,CvType.CV_32FC1);
-		distortionMatrix = new MatOfDouble();
+//		cameraMatrix = new Mat(3,3,CvType.CV_32FC1);
+//		distortionMatrix = new MatOfDouble();
+		setDistortionMatrix(new double[5]);
 	}
 	
-    /**
-     * Indicates whether this object is valid
-     */
-	public boolean isValid(){
-		return cameraMatrix != null && cameraMatrix.rows()!=0 && cameraMatrix.cols()!=0  && 
-				distortionMatrix.total() > 0;
+	public CameraParameters(double Fx, double Fy, double Cx, double Cy, double[] distortionMatrix)
+	{
+		this.setFx(Fx);
+		this.setFy(Fy);
+		this.setCx(Cx);
+		this.setCy(Cy);
+		this.setDistortionMatrix(distortionMatrix);
+	}
+	
+	public CameraParameters(String xmlFile) throws ParserConfigurationException, SAXException, IOException {
+		this();
+		readFromXML(xmlFile);
 	}
 
 	public Mat getCameraMatrix(){
+		Mat cameraMatrix = new Mat(3,3,CvType.CV_32FC1);
+		cameraMatrix.put(0, 0, 
+				getFx(), 0, getCx(),
+				0, getFy(), getCy(),
+				0, 0, 1);
+		
 		return cameraMatrix;
 	}
 	
-	public MatOfDouble getDistCoeff(){
-		return distortionMatrix;
-	}
-	
-	public void resize(Size size) throws Exception{
-	    if (!isValid()) 
-	    	throw new Exception("Can't resize - CameraParameters are invalid (have you initialized by calling readFromXML?)");
-	    if (size == camSize)
-	    	return;
-	    
-	    //now, read the camera size
-	    //resize the camera parameters to fit this image size
-	    float AxFactor= (float)(size.width)/ (float)(camSize.width);
-	    float AyFactor= (float)(size.height)/ (float)(camSize.height);
-		float[] current = new float[9];
-	    cameraMatrix.get(0, 0, current);
-		float[] buff = {current[0]*AxFactor, current[1],          current[2]*AxFactor,
-				        current[3],          current[4]*AyFactor, current[5],
-				        current[6],          current[7],          current[8]};
-		cameraMatrix.put(0, 0, buff);
+	public MatOfDouble getDistortionMatrixAsMat(){
+		return new MatOfDouble(getDistortionMatrix());
 	}
 	
 	/**
@@ -84,7 +80,7 @@ public class CameraParameters {
 	 * @throws SAXException
 	 * @throws IOException
 	 */
-	public void readFromXML(String filepath) throws ParserConfigurationException, SAXException, IOException{
+	private void readFromXML(String filepath) throws ParserConfigurationException, SAXException, IOException{
 		File file = new File(filepath);
 		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -110,10 +106,11 @@ public class CameraParameters {
 				array[i] = Double.valueOf(st.nextToken());
 				i++;
 			}
-			cameraMatrix.put(0, 0, array[0], array[1], array[2],
-					array[3], array[4], array[5],
-					array[6], array[7], array[8]);
-
+			
+			setFx(array[0]);
+			setCx(array[2]);
+			setFy(array[4]);
+			setCy(array[5]);
 		}
 		
 		nList = doc.getElementsByTagName("Distortion_Coefficients");
@@ -129,52 +126,54 @@ public class CameraParameters {
 			String data = ((Node)dataTextList.item(0)).getNodeValue().trim();
 			
 			StringTokenizer std = new StringTokenizer(data);
-			double[] coeffArray = new double[5];
-			int i = 0;
+			List<Double> coeffs = new ArrayList<Double>();
 			while(std.hasMoreElements()){
-				coeffArray[i] = Double.valueOf(std.nextToken());
-				i++;
+				coeffs.add(Double.valueOf(std.nextToken()));
+
 			}
-			distortionMatrix.fromArray(coeffArray);	
+			for (int i = 0; i < coeffs.size() && i < getDistortionMatrix().length; ++i) {
+				getDistortionMatrix()[i] = coeffs.get(i);
+			}
 		}
 	}
-	
-//	public void readFromXML(String filepath){		
-//		File file = new File(filepath);
-//
-//		Configuration conf;
-//		try {
-//			conf = new XMLConfiguration(file);
-////			Configuration cameraConf = conf.subset("camera_matrix");
-//			Configuration cameraConf = conf.subset("Camera_Matrix");
-//			String data = new String();
-//			data = cameraConf.getString("data");
-//			StringTokenizer st = new StringTokenizer(data);
-//			double[] array = new double[9];
-//			int i = 0;
-//			while(st.hasMoreElements()){
-//				array[i] = Double.valueOf(st.nextToken());
-//				i++;
-//			}
-//			cameraMatrix.put(0, 0, array[0], array[1], array[2],
-//								   array[3], array[4], array[5],
-//								   array[6], array[7], array[8]);
-//			// parse the distorsion matrix
-////			Configuration distortionConf = conf.subset("distortion_coefficients");
-//			Configuration distortionConf = conf.subset("Distortion_Coefficients");
-//			String coeffData = new String();
-//			coeffData = distortionConf.getString("data");
-//			StringTokenizer std = new StringTokenizer(coeffData);
-//			double[] coeffArray = new double[5];
-//			i = 0;
-//			while(std.hasMoreElements()){
-//				coeffArray[i] = Double.valueOf(std.nextToken());
-//				i++;
-//			}
-//			distorsionMatrix.fromArray(coeffArray);	
-//		} catch (ConfigurationException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//	}
+
+	public double getFx() {
+		return Fx;
+	}
+
+	public void setFx(double fx) {
+		Fx = fx;
+	}
+
+	public double getFy() {
+		return Fy;
+	}
+
+	public void setFy(double fy) {
+		Fy = fy;
+	}
+
+	public double getCx() {
+		return Cx;
+	}
+
+	public void setCx(double cx) {
+		Cx = cx;
+	}
+
+	public double getCy() {
+		return Cy;
+	}
+
+	public void setCy(double cy) {
+		Cy = cy;
+	}
+
+	public double[] getDistortionMatrix() {
+		return distortionMatrix;
+	}
+
+	public void setDistortionMatrix(double[] distortionMatrix) {
+		this.distortionMatrix = distortionMatrix;
+	}
 }
