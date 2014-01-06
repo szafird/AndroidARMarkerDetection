@@ -46,7 +46,7 @@ public class Utils {
 				double Ru = Math.sqrt(u*u + v*v);
 
 				// Calculate distorted vector norm
-				double Rd = invW * Math.atan(Ru * theta)/(w);
+				double Rd = invW * Math.atan(Ru * theta);
 
 				// Apply the magnitude change and convert back to pixel units
 				double xVal =  Rd * u * Fx / Ru + Cx;
@@ -93,7 +93,7 @@ public class Utils {
 				double Ru = Math.sqrt(u*u + v*v);
 
 				// Calculate distorted vector norm
-				double Rd = invW * Math.atan(Ru * theta)/(w);
+				double Rd = invW * Math.atan(Ru * theta);
 
 				// Apply the magnitude change and convert back to pixel units
 				double xVal =  Rd * u * Fx / Ru + Cx;
